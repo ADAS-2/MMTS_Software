@@ -69,6 +69,7 @@ uint8_t sw1_flag=0;
 uint8_t sw2_flag=0;
 uint8_t time_end_flag=0;
 uint8_t iot_flag=0;
+uint8_t event_flag=0;
 
 /* USER CODE END PV */
 
@@ -93,7 +94,7 @@ void motor_drive_stop(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-uint8_t data_from_iot(void) 
+int data_from_iot(void)
 {
 	/*
 	 * checking for IoT data,checking for name,mode,dutation of time;
@@ -105,59 +106,59 @@ uint8_t data_from_iot(void)
 	uint8_t mode_increment=0;
         uint8_t time_increment=0;
 
-	if (IsDataAvailable()) 
+	if (IsDataAvailable())
 	{
                 if(Wait_for("{")==1)
                 {
         	       Copy_upto("}", buff1);
-        	       HAL_UART_Transmit(&huart2, buff1, strlen(buff1),100);
+//        	       HAL_UART_Transmit(&huart2, buff1, strlen(buff1),100);
                 }
 
-		while (1) 
+		while (1)
 		{
-		      if (buff1[count] == '"') 
+		      if (buff1[count] == '"')
 		      {
 			    ++quote_double;
 		      }
 
-		     if (quote_double == 3) 
+		     if (quote_double == 3)
 		     {
-			   if (buff1[count + 1] != '"') 
+			   if (buff1[count + 1] != '"')
 			   {
 				User_Name[name_increment] = buff1[count + 1];
 				name_increment++;
 			   }
 		    }
-			
+
 		    if (quote_double == 7)
 		    {
-			   if (buff1[count + 1] != '"') 
+			   if (buff1[count + 1] != '"')
 			   {
 				Mode_of_Rotation[mode_increment] = buff1[count + 1];
 				mode_increment++;
 			   }
 		   }
-			
-		   if (quote_double == 11) 
+
+		   if (quote_double == 11)
 		   {
-			  if (buff1[count + 1] != '"') 
+			  if (buff1[count + 1] != '"')
 			  {
 				Time_Duration[time_increment] = buff1[count + 1];
 				time_increment++;
 			  }
 		   }
-			
+
 		  if (quote_double == 12)
 		  {
 			break;
 		  }
 		  ++count;
           }
-	
+
 	Time_from_Iot = atoi(Time_Duration);
 	sprintf(buff2,"Mode:%d\r\n",Time_from_Iot);
 	HAL_UART_Transmit(&huart2, buff2,strlen(buff2),100);
-		
+
 	if(strcmp(Mode_of_Rotation,"clock")==0 && Time_from_Iot)
 	{
                sprintf(buff2,"Duration:%d\r\n",Time_from_Iot);
@@ -173,7 +174,7 @@ uint8_t data_from_iot(void)
      }
 }
 
-void motor_drive_clockwise(void) 
+void motor_drive_clockwise(void)
 {
 	/*
 	 * start motor clockwise to reach Default position
@@ -209,32 +210,32 @@ void motor_drive_stop(void)
 	 * Motor Input 2- Reset
 	 */
 	HAL_UART_Transmit(&huart2, "motor stop\r\n", strlen("motor stop\r\n"), 100);
-	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_14, RESET); //Motor OFF	
+	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_14, RESET); //Motor OFF
 }
 
 void timer_start(void)
 {
 	  /*
-	  *  start timer for given seconds and buzzer on
+	  *  start timer for 10 seconds and buzzer on
 	  */
 
 	HAL_UART_Transmit(&huart2, "time enter\r\n", strlen("time enter\r\n"), 100);
 	Buzzer();
 	HAL_TIM_Base_Start_IT(&htim6);
-	time_flag = 1; // Set Timer flag to indicate the timer is on and call laser detect function in superloop
+	time_flag = 1; // Set Timer flag to indicate the timer on call laser detect function in superloop
 }
 
-void Buzzer(void) 
+void Buzzer(void)
 {
 	 /*
-	 *  buzzer to indicate timer has started
+	 *  buzzer to indicate timer as started
 	 */
 	HAL_GPIO_WritePin(GPIOB, BUZZER_Pin, 1);
 	HAL_Delay(1000);
 	HAL_GPIO_WritePin(GPIOB, BUZZER_Pin, 0);
 }
 
-void laser_detect(void) 
+void laser_detect(void)
 {
 	 /*
 	 * as timer started meanwhile start detecting the laser gun is short r not,
@@ -252,9 +253,8 @@ void laser_detect(void)
 		HAL_Delay(5000);
 		motor_drive_anticlockwise();
 		time_flag = 0; // Reset timer flag for another time will execute this function
-                sw1_flag=1;// Increment sw flag to turn on switch sw2
+         sw1_flag=1;// Increment sw flag to turn on switch sw2
 		count_sec=0;
-		HAL_TIM_Base_Stop_IT(&htim6);
 	}
 
 }
@@ -306,22 +306,21 @@ int main(void)
   while (1)
   {
 	if (iot_flag == 0)
-	{      
+	{
 		//  if IoT flag is clear then entering to Data_from_iot
-		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 1);
 		if (data_from_iot())    // Data_from_IoT function return 1 then set the I0T flag
 		    iot_flag = 1;
 	}
-	if (iot_flag) 
-	{ 
+	if (iot_flag)
+	{
 		//if IoT flag is set enter into the  function
 		 /*
 		 * initially switch-1 flag is zero,
 		 * then motor start running from default position to 90 degree position (anti-clock wise direction).
 		 */
-		if ( sw1_flag == 0)
+		if ( event_flag == 0)
 		{
-			sw1_flag=2;
+			event_flag++;
 			HAL_UART_Transmit(&huart2, "anticlockwise motor start\r\n",strlen("anticlockwise motor start\r\n"), 100);
 			motor_drive_clockwise();
 		}
@@ -330,9 +329,9 @@ int main(void)
 		* once motor touch switch-2 then motor stop, timer starts for 10 seconds,
 		* and motor also stay in 90 degree position
 		*/
-		if (HAL_GPIO_ReadPin(SW2_GPIO_Port, SW2_Pin) == 1 && sw2_flag == 0)
+		if (HAL_GPIO_ReadPin(SW2_GPIO_Port, SW2_Pin) == 1 && event_flag == 1)
 		{
-			sw2_flag=1;
+           event_flag++;
 			HAL_UART_Transmit(&huart2, "motor stop\r\n",strlen("motor stop\r\n"), 100);
 			motor_drive_stop();
 			HAL_Delay(1000);
@@ -341,20 +340,16 @@ int main(void)
 	     /*if laser is not short until after 10 seconds,
 	     * then motor start running from 90 degree position to default position(clockwise direction)
 	     */
-	     if (HAL_GPIO_ReadPin(SW2_GPIO_Port, SW2_Pin) == 0 && sw2_flag == 1)
-	     {
-		     sw2_flag=0;
-	     }
 		 /*
 		 * Once motor touch the switch-1 again(default position) stop the motor
 		 */
-	   if (HAL_GPIO_ReadPin(SW1_GPIO_Port, SW1_Pin) == 1 && sw1_flag == 1)
+	   if (HAL_GPIO_ReadPin(SW1_GPIO_Port, SW1_Pin) == 1 && event_flag == 2)
             {
 		time_end_flag=0;
-		sw1_flag = 0;
 		HAL_UART_Transmit(&huart2, "default position\r\n",strlen("default position\r\n"), 100);
 		motor_drive_stop();
 		iot_flag = 0;
+		event_flag=0;
 	   }
 	 /*
 	 *  once the timer flag is set call the laser_detect function
@@ -367,11 +362,7 @@ int main(void)
 	/*
 	 * Timer flag is reset in timer interrupt to disable the Rf tx pin
 	 */
-	else
-	{
-		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 1);
-        }
-		
+
 	if(time_end_flag)
 	{
 		Uart_flush();
@@ -665,8 +656,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim)
 		Uart_flush();
 		HAL_TIM_Base_Stop_IT(&htim6);
 		time_end_flag=1;
-
-		sw1_flag=1;
+		event_flag=2;
 		HAL_UART_Transmit(&huart2, "Time over\r\n",strlen("Time over\r\n"), 100);
 		time_flag=0;
 		count_sec=0;
