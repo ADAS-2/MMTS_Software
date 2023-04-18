@@ -93,7 +93,7 @@ void motor_drive_stop(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-int data_from_iot(void) 
+uint8_t data_from_iot(void) 
 {
 	/*
 	 * checking for IoT data,checking for name,mode,dutation of time;
@@ -215,19 +215,19 @@ void motor_drive_stop(void)
 void timer_start(void)
 {
 	  /*
-	  *  start timer for 10 seconds and buzzer on
+	  *  start timer for given seconds and buzzer on
 	  */
 
 	HAL_UART_Transmit(&huart2, "time enter\r\n", strlen("time enter\r\n"), 100);
 	Buzzer();
 	HAL_TIM_Base_Start_IT(&htim6);
-	time_flag = 1; // Set Timer flag to indicate the timer on call laser detect function in superloop
+	time_flag = 1; // Set Timer flag to indicate the timer is on and call laser detect function in superloop
 }
 
 void Buzzer(void) 
 {
 	 /*
-	 *  buzzer to indicate timer as started
+	 *  buzzer to indicate timer has started
 	 */
 	HAL_GPIO_WritePin(GPIOB, BUZZER_Pin, 1);
 	HAL_Delay(1000);
